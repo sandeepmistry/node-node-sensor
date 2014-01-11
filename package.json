@@ -1,0 +1,25 @@
+{
+  "name": "node-sensor",
+  "version": "0.0.0",
+  "description": "node.js lib for Variable Inc.'s NODE sensor",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sandeepmistry/node-node-sensor.git"
+  },
+  "keywords": [
+    "node",
+    "sensor",
+    "variable",
+    "inc."
+  ],
+  "author": "Sandeep Mistry <sandeep.mistry@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/sandeepmistry/node-node-sensor/issues"
+  },
+  "homepage": "https://github.com/sandeepmistry/node-node-sensor"
+}
