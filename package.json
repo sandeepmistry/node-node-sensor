@@ -4,7 +4,7 @@
   "description": "node.js lib for Variable Inc.'s NODE sensor",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jshint *.js"
   },
   "repository": {
     "type": "git",
@@ -21,5 +21,13 @@
   "bugs": {
     "url": "https://github.com/sandeepmistry/node-node-sensor/issues"
   },
-  "homepage": "https://github.com/sandeepmistry/node-node-sensor"
+  "homepage": "https://github.com/sandeepmistry/node-node-sensor",
+  "devDependencies": {
+    "jshint": "~2.4.1",
+    "bleno": "~0.1.1",
+    "async": "~0.2.9"
+  },
+  "dependencies": {
+    "noble": "~0.2.7"
+  }
 }

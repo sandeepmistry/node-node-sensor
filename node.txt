@@ -1,0 +1,46 @@
+peripheral with UUID 63253f15bb024170ac67028c19282786 found
+  Local Name        = NODE-B04C05A47F18
+  TX Power Level    = 4
+  Service UUIDs     = da2b84f1627948debdc0afbea0226079
+
+services and characteristics:
+1800 (Generic Access)
+  2a00 (Device Name)
+    properties  read
+    value       4e4f44452d423034433035413437463138 | 'NODE-B04C05A47F18'
+  2a01 (Appearance)
+    properties  read
+    value       0000 | ''
+  2a02 (Peripheral Privacy Flag)
+    properties  read, write
+    value       00 | ''
+  2a03 (Reconnection Address)
+    properties  read, write
+    value       000000000000 | ''
+  2a04 (Peripheral Preferred Connection Parameters)
+    properties  read
+    value       0800100000009001 | '
+1801 (Generic Attribute)
+  2a05 (Service Changed)
+    properties  indicate
+180f (Battery Service)
+  2a19 (Battery Level)
+    properties  read, notify
+    value       64 | 'd'
+da2b84f1627948debdc0afbea0226079
+  99564a02dc014d3cb04e3bb1ef0571b2
+    properties  read
+    value       03000218001a001c001d001f0021002200 | '!"'
+  a87988b9694c479c900e95dfa6c00a24
+    properties  read, write
+    value       00 | ''
+  bf03260c72054c25af4393b1c299d159
+    properties  write
+  18cda7844bd3437085bbbfed91ec86af
+    properties  indicate
+  0a1934f524b84f13984237bb167c6aff
+    properties  read, writeWithoutResponse, write
+  fdd6b4d3046d4330bdec1fd0c90cb43b
+    properties  read, notify, indicate
+    value       00 | ''
+
