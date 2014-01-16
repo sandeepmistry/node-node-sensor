@@ -56,7 +56,7 @@ NodeSensor.discover(function(nodeSensor) {
     function(callback) {
       console.log('readStatus');
       nodeSensor.readStatus(function(batteryLevel, moduleA, moduleB) {
-        console.log('\tbatteryLevel = ' + batteryLevel);
+        console.log('\tbatteryLevel = ' + batteryLevel.toFixed(1) + ' V');
         console.log('\tmodule A     = ' + moduleA);
         console.log('\tmodule B     = ' + moduleB);
 

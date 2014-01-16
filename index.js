@@ -277,8 +277,7 @@ NodeSensor.prototype.readStatus = function(callback) {
 };
 
 NodeSensor.prototype.parseBatteryLevel = function(type, subtype, data) {
-  // TODO: is this right?
-  var batteryLevel = data.readFloatLE(0);
+  var batteryLevel = data.readFloatLE(0); // 3.7 - 4.2 volts
 
   this.emit('batteryLevel', batteryLevel);
 };
