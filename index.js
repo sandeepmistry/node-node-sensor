@@ -1,6 +1,8 @@
 var events = require('events');
 var util = require('util');
 
+var debug = require('debug')('node-sensor');
+
 var noble = require('noble');
 
 var SERVICE_UUID                            = 'da2b84f1627948debdc0afbea0226079';
@@ -19,6 +21,8 @@ function NodeSensor(peripheral) {
 
   this.name = peripheral.advertisement.localName;
   this.uuid = peripheral.uuid;
+
+  this._responseBuffer = new Buffer(0);
 
   this._peripheral.on('disconnect', this.onDisconnect.bind(this));
 }
@@ -161,188 +165,79 @@ NodeSensor.prototype.writeCommand = function(command, callback) {
   this.writeDataCharacteristic(COMMAND_UUID, new Buffer('$' + command + '$'), callback);
 };
 
-NodeSensor.prototype.onService4Notify = function(data) {
-  console.log('service 4 notify ' + data.toString('hex'));
-
-  // TODO: buffer notify data and check length
-  var type = data[0];
-  var subtype = data[1];
-  
-  data = data.slice(2);
-
-  switch (type) {
-    case 0x01:
-      var dataOffset = 0;
-
-      if (subtype & 0x01) {
-        var accelerometerX = data.readInt16BE(0 + dataOffset) / 32767.0 * 8;
-        var accelerometerY = data.readInt16BE(2 + dataOffset) / 32767.0 * 8;
-        var accelerometerZ = data.readInt16BE(4 + dataOffset) / 32767.0 * 8;
-
-        this.emit('koreAccelerometerReading', accelerometerX, accelerometerY, accelerometerZ);
-
-        dataOffset += 6;
-      }
-
-      if (subtype & 0x02) {
-        var gyroscopeX = data.readInt16BE(0 + dataOffset) / 32767.0 * 2000;
-        var gyroscopeY = data.readInt16BE(2 + dataOffset) / 32767.0 * 2000;
-        var gyroscopeZ = data.readInt16BE(4 + dataOffset) / 32767.0 * 2000;
-
-        this.emit('koreGyroscopeReading', gyroscopeX, gyroscopeY, gyroscopeZ);
-
-        dataOffset += 6;
-      }
-
-      if (subtype & 0x04) {
-        var magnetometerX = data.readInt16BE(0 + dataOffset) / 980.0;
-        var magnetometerY = data.readInt16BE(2 + dataOffset) / 980.0;
-        var magnetometerZ = data.readInt16BE(4 + dataOffset) / 1100.0;
-
-        this.emit('koreMagnetometerReading', magnetometerX, magnetometerY, magnetometerZ);
-
-        dataOffset += 6;
-      }
-      break;
-
-    case 0x03:
-      var irTemperature = data.readFloatLE(0);
-
-      this.emit('thermaTemperatureReading', irTemperature);
-      break;
-
-    case 0x04:
-      switch (subtype) {
-        case 0x00:
-          var temperature = data.readInt32LE(0) / 10.0;
-          var pressure = data.readInt32LE(4) / 10000.0;
-
-          this.emit('climaTemperatureReading', temperature);
-          this.emit('climaPressureReading', pressure);
-          break;
-
-        case 0x01:
-          var humidity = data.readInt16LE(0) / 10.0;
-
-          this.emit('climaHumidityReading', humidity);
-          break;
-
-        case 0x03:
-          var light = data.readFloatLE(0);
-
-          this.emit('climaLightReading', light);
-          break;
-      }
-      break;
-
-    case 0x05:
-      switch (subtype) {
-        case 0x00:
-          var MODULE_MAPPER = {
-            0xff: 'None',
-            0x00: 'Luma',
-            0x01: 'Clima',
-            0x02: 'Therma',
-            0x03: 'Oxa',
-            0x04: 'Chroma',
-            0x05: 'ArrTherma',
-            0x06: 'GPS',
-            0x07: 'Thermocouple',
-            0x08: 'ClimaPro',
-            0x09: 'BarCode',
-            0x0a: 'IO'
-          };
-
-          var batteryLevel = data.readFloatLE(0);
-          var moduleA = MODULE_MAPPER[data[6]] || 'Unknown';
-          var moduleB = MODULE_MAPPER[data[7]] || 'Unknown';
-
-          this.emit('status', batteryLevel, moduleA, moduleB);
-          break;
-
-        case 0x05:
-          this.emit('buttonPush');
-          break;
-
-        case 0x06:
-          this.emit('buttonRelease');
-          break;
-
-        case 0x09:
-          var serialType = {
-            0x00: 'Core',
-            0x01: 'ModuleA',
-            0x02: 'ModuleB'
-          }[data[0]];
-
-          var serial = data.slice(1).toString('hex');
-
-          if (serialType) {
-            this.emit('serial' + serialType, serial);
-          }
-          break;
-
-        case 0x0a:
-          var moduleAVersion = data[0];
-          var moduleBVersion = data[1];
-
-          this.emit('moduleVersions', moduleAVersion, moduleBVersion);
-          break;
-
-        case 0x11:
-          var quietMode = data[0] ? true : false;
-
-          this.emit('quietMode', quietMode);
-          break;
-
-        case 0x012:
-          var firmware = data[0] + '.' + data[1];
-          var model = data.slice(4).toString();
-
-          this.emit('version', firmware, model);
-          break;
-      }
-      break;
-
-    case 0x06:
-      switch (subtype) {
-        case 0x00:
-          var clear = 0; //data[4];
-          var red = 0; //data[5];
-          var green = 0; //data[6];
-          var blue = 0; //data[7];
-
-          var temp = 0; //data.readFloatBE(11);
-
-          this.emit('chromaReading', clear, red, green, blue, temp);
-          break;
-      }
-      break;
-
-    case 0x09:
-      switch (subtype) {
-        case 0x00:
-          var thermocouplTemperature = data.readFloatLE(0) / 100.0;
-
-          this.emit('thermocoupleTemperatureReading', thermocouplTemperature);
-          break;
-      }
-      break;
-
-    case 0x0c:
-      switch (subtype) {
-        case 0x0c:
-          var barCode = data.toString();
-
-          this.emit('barCodeReading', barCode);
-          break;
-      }
-      break;
+// Table of: type, subtype: size, parser method
+var responseHandlers = {
+  0x01: {
+    0x01: [8,  'parseKoreReading'],
+    0x02: [8,  'parseKoreReading'],
+    0x03: [14, 'parseKoreReading'],
+    0x04: [8,  'parseKoreReading'],
+    0x05: [14, 'parseKoreReading'],
+    0x06: [14, 'parseKoreReading'],
+    0x07: [20, 'parseKoreReading'],
+  },
+  0x03: {
+    0x03: [6, 'parseThermaReading']
+  },
+  0x04: {
+    0x00: [10, 'parseClimaTemperaturePressure'],
+    0x01: [4,  'parseClimaHumidity'],
+    0x03: [6,  'parseClimaLight']
+  },
+  0x05: {
+    0x00: [6, 'parseBatteryLevel'],
+    0x05: [3, 'parseButtonPush'],
+    0x06: [3, 'parseButtonRelease'],
+    0x07: [4, 'parseModuleTypes'],
+    0x09: [9, 'parseSerial'],
+    0x0a: [4, 'parseModuleVersions'],
+    0x11: [3, 'parseQuietMode'],
+    0x12: [4, 'parseFirmwareVersion'],
+    0x20: [6, 'parseModel']
+  },
+  0x06: {
+    0x00: [10, 'parseChromaReading'],
+    0x02: [6,  'parseChromaTemperatureReading']
+  },
+  0x09: {
+    0x00: [6, 'parseThermocoupleReading']
+  },
+  0x0c: {
+    0x0c: [15, 'parseBarCodeReading']
   }
 };
 
+NodeSensor.prototype.onService4Notify = function(data) {
+  debug('service 4 notify ' + data.toString('hex'));
+
+  this._responseBuffer = Buffer.concat([this._responseBuffer, data]);
+
+  var parsed;
+
+  do {
+    var type = this._responseBuffer[0];
+    var subtype = this._responseBuffer[1];
+
+    data = this._responseBuffer.slice(2);
+
+    parsed = false;
+
+    if (responseHandlers[type] && responseHandlers[type][subtype]) {
+      var size       = responseHandlers[type][subtype][0];
+      var methodName = responseHandlers[type][subtype][1];
+
+      if (this._responseBuffer.length >= size) {
+        this[methodName](type, subtype, data);
+
+        parsed = true;
+        this._responseBuffer = this._responseBuffer.slice(size);
+      }
+    }
+  } while(parsed && this._responseBuffer.length);
+};
+
 NodeSensor.prototype.onService6Notify = function(data) {
-  console.log('service 6 notify ' + data.toString('hex'));
+  debug('service 6 notify ' + data.toString('hex'));
 };
 
 NodeSensor.prototype.readService6 = function(callback) {
@@ -350,33 +245,64 @@ NodeSensor.prototype.readService6 = function(callback) {
 };
 
 NodeSensor.prototype.readVersion = function(callback) {
-  this.once('version', callback);
+  this.once('firmwareVersion', function(firmwareVersion) {
+    this.once('model', function(model) {
+      callback(firmwareVersion, model);
+    }.bind(this));
+  }.bind(this));
 
   this.writeCommand('VER');
 };
 
+NodeSensor.prototype.parseFirmwareVersion = function(type, subtype, data) {
+  var firmwareVersion = data[0] + '.' + data[1];
+
+  this.emit('firmwareVersion', firmwareVersion);
+};
+
+NodeSensor.prototype.parseModel = function(type, subtype, data) {
+  var model = data.toString();
+
+  this.emit('model', model);
+};
+
 NodeSensor.prototype.readStatus = function(callback) {
-  this.once('status', callback);
+  this.once('batteryLevel', function(batteryLevel) {
+    this.once('moduleTypes', function(moduleA, moduleB) {
+      callback(batteryLevel, moduleA, moduleB);
+    }.bind(this));
+  }.bind(this));
 
   this.writeCommand('STAT');
 };
 
-NodeSensor.prototype.readModuleVersions = function(callback) {
-  this.once('moduleVersions', callback);
+NodeSensor.prototype.parseBatteryLevel = function(type, subtype, data) {
+  // TODO: is this right?
+  var batteryLevel = data.readFloatLE(0);
 
-  this.writeCommand('STATMODVER');
+  this.emit('batteryLevel', batteryLevel);
 };
 
-NodeSensor.prototype.readQuietMode = function(callback) {
-  this.once('quietMode', callback);
+NodeSensor.prototype.parseModuleTypes = function(type, subtype, data) {
+  var MODULE_MAPPER = {
+    0xff: 'None',
+    0x00: 'Luma',
+    0x01: 'Clima',
+    0x02: 'Therma',
+    0x03: 'Oxa',
+    0x04: 'Chroma',
+    0x05: 'ArrTherma',
+    0x06: 'GPS',
+    0x07: 'Thermocouple',
+    0x08: 'ClimaPro',
+    0x09: 'BarCode',
+    0x0a: 'IO'
+  };
 
-  this.writeCommand('QM?');
-};
+  var moduleA = MODULE_MAPPER[data[0]] || 'Unknown';
+  var moduleB = MODULE_MAPPER[data[1]] || 'Unknown';
 
-NodeSensor.prototype.writeQuietMode = function(on, callback) {
-  this.once('quietMode', callback);
-
-  this.writeCommand('QM,' + (on ? '1' : '0'));
+  this.emit('moduleTypes', moduleA, moduleB);
 };
 
 NodeSensor.prototype.readSerials = function(callback) {
@@ -391,6 +317,59 @@ NodeSensor.prototype.readSerials = function(callback) {
   this.writeCommand('SER');
 };
 
+NodeSensor.prototype.parseSerial = function(type, subtype, data) {
+  var serialType = {
+    0x00: 'Core',
+    0x01: 'ModuleA',
+    0x02: 'ModuleB'
+  }[data[0]];
+
+  var serial = data.slice(1).toString('hex');
+
+  if (serialType) {
+    this.emit('serial' + serialType, serial);
+  }
+};
+
+NodeSensor.prototype.readModuleVersions = function(callback) {
+  this.once('moduleVersions', callback);
+
+  this.writeCommand('STATMODVER');
+};
+
+NodeSensor.prototype.parseModuleVersions = function(type, subtype, data) {
+  var moduleAVersion = data[0];
+  var moduleBVersion = data[1];
+
+  this.emit('moduleVersions', moduleAVersion, moduleBVersion);
+};
+
+NodeSensor.prototype.readQuietMode = function(callback) {
+  this.once('quietMode', callback);
+
+  this.writeCommand('QM?');
+};
+
+NodeSensor.prototype.parseQuietMode = function(type, subtype, data) {
+  var quietMode = data[0] ? true : false;
+
+  this.emit('quietMode', quietMode);
+};
+
+NodeSensor.prototype.writeQuietMode = function(on, callback) {
+  this.once('quietMode', callback);
+
+  this.writeCommand('QM,' + (on ? '1' : '0'));
+};
+
+NodeSensor.prototype.parseButtonPush = function(type, subtype, data) {
+  this.emit('buttonPush');
+};
+
+NodeSensor.prototype.parseButtonRelease = function(type, subtype, data) {
+  this.emit('buttonRelease');
+};
+
 NodeSensor.prototype.writeKoreMode = function(accelerometer, gyroscope, magnetometer, period, callback) {
   this.writeCommand(
     'KORE,' +
@@ -401,6 +380,40 @@ NodeSensor.prototype.writeKoreMode = function(accelerometer, gyroscope, magnetom
     '0',
     callback
   );
+};
+
+NodeSensor.prototype.parseKoreReading = function(type, subtype, data) {
+  var dataOffset = 0;
+
+  if (subtype & 0x01) {
+    var accelerometerX = data.readInt16BE(0 + dataOffset) / 32767.0 * 8;
+    var accelerometerY = data.readInt16BE(2 + dataOffset) / 32767.0 * 8;
+    var accelerometerZ = data.readInt16BE(4 + dataOffset) / 32767.0 * 8;
+
+    this.emit('koreAccelerometerReading', accelerometerX, accelerometerY, accelerometerZ);
+
+    dataOffset += 6;
+  }
+
+  if (subtype & 0x02) {
+    var gyroscopeX = data.readInt16BE(0 + dataOffset) / 32767.0 * 2000;
+    var gyroscopeY = data.readInt16BE(2 + dataOffset) / 32767.0 * 2000;
+    var gyroscopeZ = data.readInt16BE(4 + dataOffset) / 32767.0 * 2000;
+
+    this.emit('koreGyroscopeReading', gyroscopeX, gyroscopeY, gyroscopeZ);
+
+    dataOffset += 6;
+  }
+
+  if (subtype & 0x04) {
+    var magnetometerX = data.readInt16BE(0 + dataOffset) / 980.0;
+    var magnetometerY = data.readInt16BE(2 + dataOffset) / 980.0;
+    var magnetometerZ = data.readInt16BE(4 + dataOffset) / 1100.0;
+
+    this.emit('koreMagnetometerReading', magnetometerX, magnetometerY, magnetometerZ);
+
+    dataOffset += 6;
+  }
 };
 
 NodeSensor.prototype.writeLumaMode = function(mode, callback) { // mode 0 - 255, 1 bit per LED
@@ -423,6 +436,26 @@ NodeSensor.prototype.writeClimaMode = function(temperaturePressure, humidity, li
   );
 };
 
+NodeSensor.prototype.parseClimaTemperaturePressure = function(type, subtype, data) {
+  var temperature = data.readInt32LE(0) / 10.0;
+  var pressure = data.readInt32LE(4) / 10000.0;
+
+  this.emit('climaTemperatureReading', temperature);
+  this.emit('climaPressureReading', pressure);
+};
+
+NodeSensor.prototype.parseClimaHumidity = function(type, subtype, data) {
+  var humidity = data.readInt16LE(0) / 10.0;
+
+  this.emit('climaHumidityReading', humidity);
+};
+
+NodeSensor.prototype.parseClimaLight = function(type, subtype, data) {
+  var light = data.readFloatLE(0);
+
+  this.emit('climaLightReading', light);
+};
+
 NodeSensor.prototype.writeThermaMode = function(ir, led, period, callback) {
   this.writeCommand(
     'IRTHRM,' +
@@ -435,9 +468,29 @@ NodeSensor.prototype.writeThermaMode = function(ir, led, period, callback) {
 };
 
 NodeSensor.prototype.readChroma = function(callback) {
-  this.once('chromaReading', callback);
+  this.once('chromaReading', function(clear, red, green, blue) {
+    this.once('chromaTemperatureReading', function(temperature) {
+      callback(clear, red, green, blue, temperature);
+    }.bind(this));
+  }.bind(this));
 
   this.writeCommand('VERA,255,3,0,120'); // version 1: this.writeCommand('VERA,255,1,1,2');
+};
+
+NodeSensor.prototype.parseChromaReading = function(type, subtype, data) {
+  // TODO: is this right?
+  var clear = data[0];
+  var red   = data[1];
+  var green = data[2];
+  var blue  = data[3];
+
+  this.emit('chromaReading', clear, red, green, blue);
+};
+
+NodeSensor.prototype.parseChromaTemperatureReading = function(type, subtype, data) {
+  var temperature = data.readFloatBE(0);
+
+  this.emit('chromaTemperatureReading', temperature);
 };
 
 NodeSensor.prototype.writeThermaMode = function(ir, led, period, callback) {
@@ -451,7 +504,14 @@ NodeSensor.prototype.writeThermaMode = function(ir, led, period, callback) {
   );
 };
 
+NodeSensor.prototype.parseThermaReading = function(type, subtype, data) {
+  var irTemperature = data.readFloatLE(0);
+
+  this.emit('thermaTemperatureReading', irTemperature);
+};
+
 NodeSensor.prototype.writeThermocoupleMode = function(enabled, period, callback) {
+  // TODO: is this right?
   this.writeCommand(
     'TCPL,' +
     (enabled ? '1' : '0') + ',' +
@@ -461,18 +521,17 @@ NodeSensor.prototype.writeThermocoupleMode = function(enabled, period, callback)
   );
 };
 
-// TCPL enable,period,lifetime
-// BARC,1$
-// // 
-// IO_INIT_UART,%d,%d$
-// IO_UART,%02d,
-// UART Message for IO Module: 
-// IO_PD$
-// IO_INIT_PINS,%02X,%02X$
-// IO_PIN,%02X,%02X$
-// IO_PIN,00,00$
-// IO_A2D,0$
-// IO_A2D,1$
-// IO_STREAM,%d,%d,%d$
+NodeSensor.prototype.parseThermocoupleReading = function(type, subtype, data) {
+  // TODO: is this right?
+  var thermocouplTemperature = data.readFloatLE(0) / 100.0;
+
+  this.emit('thermocoupleTemperatureReading', thermocouplTemperature);
+};
+
+NodeSensor.prototype.parseBarCodeReading = function(type, subtype, data) {
+  var barCode = data.toString();
+
+  this.emit('barCodeReading', barCode);
+};
 
 module.exports = NodeSensor;

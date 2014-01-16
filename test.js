@@ -96,34 +96,34 @@ NodeSensor.discover(function(nodeSensor) {
         callback();
       });
     },
-    // function(callback) {
-    //   nodeSensor.on('koreAccelerometerReading', function(x, y, z) {
-    //     console.log('\t* Kore accelerometer reading ' + x.toFixed(1) + ', ' + y.toFixed(1) + ', ' + z.toFixed(1) + ' G');
-    //   });
+    function(callback) {
+      nodeSensor.on('koreAccelerometerReading', function(x, y, z) {
+        console.log('\t* Kore accelerometer reading ' + x.toFixed(1) + ', ' + y.toFixed(1) + ', ' + z.toFixed(1) + ' G');
+      });
 
-    //   nodeSensor.on('koreGyroscopeReading', function(x, y, z) {
-    //     console.log('\t* Kore gyroscope reading     ' + x.toFixed(1) + ', ' + y.toFixed(1) + ', ' + z.toFixed(1) + ' °/s');
-    //   });
+      nodeSensor.on('koreGyroscopeReading', function(x, y, z) {
+        console.log('\t* Kore gyroscope reading     ' + x.toFixed(1) + ', ' + y.toFixed(1) + ', ' + z.toFixed(1) + ' °/s');
+      });
 
-    //   nodeSensor.on('koreMagnetometerReading', function(x, y, z) {
-    //     console.log('\t* Kore magnetometer reading  ' + x.toFixed(1) + ', ' + y.toFixed(1) + ', ' + z.toFixed(1) + ' μT');
-    //   });
-    //   async.series([
-    //     function(callback) {
-    //       console.log('writeKoreMode true true true 10');
-    //       nodeSensor.writeKoreMode(true, true, true, 10, function() {
-    //         setTimeout(callback, 1000);
-    //       });
-    //     },
-    //     function(callback) {
-    //       console.log('writeKoreMode false false false 10');
-    //       nodeSensor.writeKoreMode(false, false, false, 10, callback);
-    //     },
-    //     function() {
-    //       callback();
-    //     }
-    //   ]);
-    // },
+      nodeSensor.on('koreMagnetometerReading', function(x, y, z) {
+        console.log('\t* Kore magnetometer reading  ' + x.toFixed(1) + ', ' + y.toFixed(1) + ', ' + z.toFixed(1) + ' μT');
+      });
+      async.series([
+        function(callback) {
+          console.log('writeKoreMode true true true 10');
+          nodeSensor.writeKoreMode(true, true, true, 10, function() {
+            setTimeout(callback, 1000);
+          });
+        },
+        function(callback) {
+          console.log('writeKoreMode false false false 10');
+          nodeSensor.writeKoreMode(false, false, false, 10, callback);
+        },
+        function() {
+          callback();
+        }
+      ]);
+    },
     function(callback) {
       if (hasLuma) {
         async.series([
@@ -227,22 +227,22 @@ NodeSensor.discover(function(nodeSensor) {
         callback();
       }
     },
-    // function(callback) {
-    //   if (hasChroma) {
-    //     console.log('readChroma');
-    //     nodeSensor.readChroma(function(clear, red, green, blue, temperature) {
-    //       console.log('\tclear       = ' + clear);
-    //       console.log('\tred         = ' + red);
-    //       console.log('\tgreen       = ' + green);
-    //       console.log('\tblue        = ' + blue);
-    //       console.log('\ttemperature = ' + temperature.toFixed(1));
-    //       callback();
-    //     });
-    //   } else {
-    //     console.log('No Chroma');
-    //     callback();
-    //   }
-    // },
+    function(callback) {
+      if (hasChroma) {
+        console.log('readChroma');
+        nodeSensor.readChroma(function(clear, red, green, blue, temperature) {
+          console.log('\tclear       = ' + clear);
+          console.log('\tred         = ' + red);
+          console.log('\tgreen       = ' + green);
+          console.log('\tblue        = ' + blue);
+          console.log('\ttemperature = ' + temperature.toFixed(1));
+          callback();
+        });
+      } else {
+        console.log('No Chroma');
+        callback();
+      }
+    },
     function(callback) {
       if (hasBarCode) {
         nodeSensor.on('barCodeReading', function(barCode) {
@@ -266,7 +266,7 @@ NodeSensor.discover(function(nodeSensor) {
           function(callback) {
             console.log('writeThermocoupleMode true 10');
             nodeSensor.writeThermocoupleMode(true, 10, function() {
-              setTimeout(callback, 10000);
+              setTimeout(callback, 2000);
             });
           },
           function(callback) {
