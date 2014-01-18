@@ -22,6 +22,12 @@ function NodeSensor(peripheral) {
   this.name = peripheral.advertisement.localName;
   this.uuid = peripheral.uuid;
 
+  this._moduleAType = 'Unknown';
+  this._moduleBType = 'Unknown';
+
+  this._moduleASubtype = 'Unknown';
+  this._moduleBSubtype = 'Unknown';
+
   this._responseBuffer = new Buffer(0);
 
   this._peripheral.on('disconnect', this.onDisconnect.bind(this));
@@ -162,6 +168,8 @@ NodeSensor.prototype.writeService1 = function(data, callback) {
 };
 
 NodeSensor.prototype.writeCommand = function(command, callback) {
+  debug('writeCommand $' + command + '$');
+
   this.writeDataCharacteristic(COMMAND_UUID, new Buffer('$' + command + '$'), callback);
 };
 
@@ -189,6 +197,7 @@ var responseHandlers = {
     0x05: [3, 'parseButtonPush'],
     0x06: [3, 'parseButtonRelease'],
     0x07: [4, 'parseModuleTypes'],
+    0x08: [4, 'parseModuleSubtypes'],
     0x09: [9, 'parseSerial'],
     0x0a: [4, 'parseModuleVersions'],
     0x11: [3, 'parseQuietMode'],
@@ -199,11 +208,15 @@ var responseHandlers = {
     0x00: [10, 'parseChromaReading'],
     0x02: [6,  'parseChromaTemperatureReading']
   },
+  0x07: {
+    0x01: [6, 'parseOxaReading'],
+    0x12: [6, 'parseOxaBaseline']
+  },
   0x09: {
     0x00: [6, 'parseThermocoupleReading']
   },
   0x0c: {
-    0x0c: [15, 'parseBarCodeReading']
+    0x0c: [0, 'parseBarCodeReading']
   }
 };
 
@@ -225,6 +238,10 @@ NodeSensor.prototype.onService4Notify = function(data) {
     if (responseHandlers[type] && responseHandlers[type][subtype]) {
       var size       = responseHandlers[type][subtype][0];
       var methodName = responseHandlers[type][subtype][1];
+
+      if (size === 0) {
+        size = this._responseBuffer.length;
+      }
 
       if (this._responseBuffer.length >= size) {
         this[methodName](type, subtype, data);
@@ -301,6 +318,9 @@ NodeSensor.prototype.parseModuleTypes = function(type, subtype, data) {
   var moduleA = MODULE_MAPPER[data[0]] || 'Unknown';
   var moduleB = MODULE_MAPPER[data[1]] || 'Unknown';
 
+  this._moduleAType = moduleA;
+  this._moduleBType = moduleB;
+
   this.emit('moduleTypes', moduleA, moduleB);
 };
 
@@ -328,6 +348,46 @@ NodeSensor.prototype.parseSerial = function(type, subtype, data) {
   if (serialType) {
     this.emit('serial' + serialType, serial);
   }
+};
+
+NodeSensor.prototype.readModuleSubtypes = function(callback) {
+  this.once('moduleSubtypes', callback);
+
+  this.writeCommand('STATMOD');  
+};
+
+NodeSensor.prototype.parseModuleSubtypes = function(type, subtype, data) {
+  var moduleASubtype = data[0];
+  var moduleBSubtype = data[1];
+
+  var OXA_MAPPER = {
+    0: 'CO',
+    1: 'CL2',
+    2: 'SO2',
+    3: 'NO',
+    4: 'NO2',
+    5: 'H2S'
+  };
+
+  var CHROMA_MAPPER = {
+    0: '1.0',
+    1: '1.1',
+    2: '2.0'
+  };
+
+  if (this._moduleAType === 'Oxa') {
+    this._moduleASubtype = moduleASubtype = OXA_MAPPER[moduleASubtype] || moduleASubtype;
+  } else if (this._moduleAType === 'Chroma') {
+    this._moduleASubtype = moduleASubtype = CHROMA_MAPPER[moduleASubtype] || moduleASubtype;
+  }
+
+  if (this._moduleBType === 'Oxa') {
+    this._moduleBSubtype = moduleASubtype = OXA_MAPPER[moduleBSubtype] || moduleBSubtype;
+  } else if (this._moduleBType === 'Chroma') {
+    this._moduleBSubtype = moduleBSubtype = CHROMA_MAPPER[moduleBSubtype] || moduleBSubtype;
+  }
+
+  this.emit('moduleSubtypes', moduleASubtype, moduleBSubtype);
 };
 
 NodeSensor.prototype.readModuleVersions = function(callback) {
@@ -385,9 +445,9 @@ NodeSensor.prototype.parseKoreReading = function(type, subtype, data) {
   var dataOffset = 0;
 
   if (subtype & 0x01) {
-    var accelerometerX = data.readInt16BE(0 + dataOffset) / 32767.0 * 8;
-    var accelerometerY = data.readInt16BE(2 + dataOffset) / 32767.0 * 8;
-    var accelerometerZ = data.readInt16BE(4 + dataOffset) / 32767.0 * 8;
+    var accelerometerX = data.readInt16BE(0 + dataOffset) / 32767.0 * 16;
+    var accelerometerY = data.readInt16BE(2 + dataOffset) / 32767.0 * 16;
+    var accelerometerZ = data.readInt16BE(4 + dataOffset) / 32767.0 * 16;
 
     this.emit('koreAccelerometerReading', accelerometerX, accelerometerY, accelerometerZ);
 
@@ -466,6 +526,60 @@ NodeSensor.prototype.writeThermaMode = function(ir, led, period, callback) {
   );
 };
 
+NodeSensor.prototype.readOxaBaseline = function(module, callback) { // module 'A', or 'B'
+  this.once('oxaBaseline', callback);
+
+  var port = (module.indexOf('A') === 0) ? '1' : '2';
+
+  this.writeCommand('OXABP?,' + port); 
+};
+
+NodeSensor.prototype.parseOxaBaseline = function(type, subtype, data) {
+  var baseline = data.readFloatLE(0);
+
+  this.emit('oxaBaseline', baseline);
+};
+
+NodeSensor.prototype.writeOxaMode = function(enabled, tiaGain, rLoad, refSource, intZ, biasSign, bias, eftShort, opMode, period, callback) {
+  this.writeCommand(
+    'OXA,' +
+    (enabled ? '1' : '0') + ',' +
+    (tiaGain << 2 | rLoad) + ',' +
+    (refSource << 7 | intZ << 5 | biasSign << 4 | bias) + ',' +
+    (eftShort << 7 | opMode) + ',' +
+    period + ',' +
+    '0',
+    callback
+  );
+};
+
+NodeSensor.prototype.writeOxaCOMode = function(enabled, period, callback) {
+  // Tia Gain       35
+  // Int Z          20
+  // Ref Source     External
+  // Bias Sign      Positive
+  // Bias Value     0
+  // Shorting EFT   Disabled
+  // Op mode        3 Lead Amperometric
+
+  // this.writeOxaMode(enabled, 5, 0, 1, 0, 1, 0, 0, 1, period, callback);
+
+  this.writeCommand(
+    'OXA,' + 
+    (enabled ? '2' : '0') + ',' +
+    '28,128,2,' +
+    Math.round(period / 25) + ',' +
+    '0',
+    callback
+  );
+};
+
+NodeSensor.prototype.parseOxaReading = function(type, subtype, data) {
+  var reading = data.readFloatLE(0);
+
+  this.emit('oxaReading', reading);
+};
+
 NodeSensor.prototype.readChroma = function(callback) {
   this.once('chromaReading', function(clear, red, green, blue) {
     this.once('chromaTemperatureReading', function(temperature) {
@@ -473,21 +587,21 @@ NodeSensor.prototype.readChroma = function(callback) {
     }.bind(this));
   }.bind(this));
 
-  this.writeCommand('VERA,255,3,0,120'); // version 1: this.writeCommand('VERA,255,1,1,2');
+  this.writeCommand('VERA,255,3,0,120'); // for version 1: VERA,255,1,1,2
 };
 
 NodeSensor.prototype.parseChromaReading = function(type, subtype, data) {
-  // TODO: is this right?
-  var clear = data[0];
-  var red   = data[1];
-  var green = data[2];
-  var blue  = data[3];
+  // TODO: these are raw values, need to convert
+  var clear = data.readUInt16LE(0);
+  var red   = data.readUInt16LE(2);
+  var green = data.readUInt16LE(4);
+  var blue  = data.readUInt16LE(6);
 
   this.emit('chromaReading', clear, red, green, blue);
 };
 
 NodeSensor.prototype.parseChromaTemperatureReading = function(type, subtype, data) {
-  var temperature = data.readFloatBE(0);
+  var temperature = data.readFloatLE(0);
 
   this.emit('chromaTemperatureReading', temperature);
 };
@@ -510,19 +624,17 @@ NodeSensor.prototype.parseThermaReading = function(type, subtype, data) {
 };
 
 NodeSensor.prototype.writeThermocoupleMode = function(enabled, period, callback) {
-  // TODO: is this right?
   this.writeCommand(
     'TCPL,' +
     (enabled ? '1' : '0') + ',' +
-    Math.round(period / 10) + ',' +
+    period + ',' +
     '0',
     callback
   );
 };
 
 NodeSensor.prototype.parseThermocoupleReading = function(type, subtype, data) {
-  // TODO: is this right?
-  var thermocouplTemperature = data.readFloatLE(0) / 100.0;
+  var thermocouplTemperature = data.readFloatLE(0);
 
   this.emit('thermocoupleTemperatureReading', thermocouplTemperature);
 };

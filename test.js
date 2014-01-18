@@ -8,9 +8,13 @@ NodeSensor.discover(function(nodeSensor) {
   var hasLuma         = false;
   var hasClima        = false;
   var hasTherma       = false;
+  var hasOxa          = false;
   var hasChroma       = false;
   var hasBarCode      = false;
   var hasThermocouple = false;
+
+  var oxaModule;
+  var hasOxaCO        = false;
 
   nodeSensor.on('disconnect', function() {
     console.log('disconnected!');
@@ -63,9 +67,27 @@ NodeSensor.discover(function(nodeSensor) {
         hasLuma         = (moduleA === 'Luma')         || (moduleB === 'Luma');
         hasClima        = (moduleA === 'Clima')        || (moduleB === 'Clima');
         hasTherma       = (moduleA === 'Therma')       || (moduleB === 'Therma');
+        hasOxa          = (moduleA === 'Oxa')          || (moduleB === 'Oxa');
         hasChroma       = (moduleA === 'Chroma')       || (moduleB === 'Chroma');
         hasBarCode      = (moduleA === 'BarCode')      || (moduleB === 'BarCode');
         hasThermocouple = (moduleA === 'Thermocouple') || (moduleB === 'Thermocouple');
+
+        if (hasOxa) {
+          oxaModule = (moduleA === 'Oxa') ? 'A' : 'B';
+        }
+
+        callback();
+      });
+    },
+    function(callback) {
+      console.log('readModuleSubtypes');
+      nodeSensor.readModuleSubtypes(function(moduleASubtype, moduleBSubtype) {
+        console.log('\tmodule A subtype = ' + moduleASubtype);
+        console.log('\tmodule B subtype = ' + moduleBSubtype);
+
+        if (hasOxa) {
+          hasOxaCO = (moduleASubtype === 'CO') || (moduleBSubtype === 'CO');
+        }
 
         callback();
       });
@@ -106,18 +128,18 @@ NodeSensor.discover(function(nodeSensor) {
       });
 
       nodeSensor.on('koreMagnetometerReading', function(x, y, z) {
-        console.log('\t* Kore magnetometer reading  ' + x.toFixed(1) + ', ' + y.toFixed(1) + ', ' + z.toFixed(1) + ' μT');
+        console.log('\t* Kore magnetometer reading  ' + x.toFixed(1) + ', ' + y.toFixed(1) + ', ' + z.toFixed(1) + ' G');
       });
       async.series([
         function(callback) {
-          console.log('writeKoreMode true true true 10');
-          nodeSensor.writeKoreMode(true, true, true, 10, function() {
+          console.log('writeKoreMode true true true 100');
+          nodeSensor.writeKoreMode(true, true, true, 100, function() {
             setTimeout(callback, 1000);
           });
         },
         function(callback) {
           console.log('writeKoreMode false false false 10');
-          nodeSensor.writeKoreMode(false, false, false, 10, callback);
+          nodeSensor.writeKoreMode(false, false, false, 100, callback);
         },
         function() {
           callback();
@@ -228,21 +250,66 @@ NodeSensor.discover(function(nodeSensor) {
       }
     },
     function(callback) {
-      if (hasChroma) {
-        console.log('readChroma');
-        nodeSensor.readChroma(function(clear, red, green, blue, temperature) {
-          console.log('\tclear       = ' + clear);
-          console.log('\tred         = ' + red);
-          console.log('\tgreen       = ' + green);
-          console.log('\tblue        = ' + blue);
-          console.log('\ttemperature = ' + temperature.toFixed(1));
-          callback();
+      if (hasOxa) {
+        nodeSensor.on('oxaReading', function(reading) {
+          console.log('\t* Oxa reading ' + reading + ' ppm');
         });
+
+        async.series([
+          function(callback) {
+            console.log('readOxaBaseline ' + oxaModule);
+            nodeSensor.readOxaBaseline(oxaModule, function(baseline) {
+              console.log('\tbaseline = ' + baseline.toFixed(6));
+
+              callback();
+            });
+          },
+          function(callback) {
+            if (hasOxaCO) {
+              async.series([
+                function(callback) {
+                  console.log('writeOxaCOMode true 100');
+                  nodeSensor.writeOxaCOMode(true, 100, function() {
+                    setTimeout(callback, 1000);
+                  });
+                },
+                function(callback) {
+                  console.log('writeOxaCOMode false 100');
+                  nodeSensor.writeOxaCOMode(false, 100, callback);
+                },
+                function() {
+                  callback();
+                }
+              ]);
+            } else {
+              console.log('No Oxa CO');
+            }
+          },
+          function() {
+            callback();
+          }
+        ]);
       } else {
-        console.log('No Chroma');
+        console.log('No Oxa');
         callback();
       }
     },
+    // function(callback) {
+    //   if (hasChroma) {
+    //     console.log('readChroma');
+    //     nodeSensor.readChroma(function(clear, red, green, blue, temperature) {
+    //       console.log('\tclear       = ' + clear);
+    //       console.log('\tred         = ' + red);
+    //       console.log('\tgreen       = ' + green);
+    //       console.log('\tblue        = ' + blue);
+    //       console.log('\ttemperature = ' + temperature.toFixed(1));
+    //       callback();
+    //     });
+    //   } else {
+    //     console.log('No Chroma');
+    //     callback();
+    //   }
+    // },
     function(callback) {
       if (hasBarCode) {
         nodeSensor.on('barCodeReading', function(barCode) {
