@@ -515,17 +515,6 @@ NodeSensor.prototype.parseClimaLight = function(type, subtype, data) {
   this.emit('climaLightReading', light);
 };
 
-NodeSensor.prototype.writeThermaMode = function(ir, led, period, callback) {
-  this.writeCommand(
-    'IRTHRM,' +
-    (ir ? '1' : '0') + ',' +
-    (led ? '1' : '0') + ',' +
-    Math.round(period / 10) + ',' +
-    '0',
-    callback
-  );
-};
-
 NodeSensor.prototype.readOxaBaseline = function(module, callback) { // module 'A', or 'B'
   this.once('oxaBaseline', callback);
 
