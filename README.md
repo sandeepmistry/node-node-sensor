@@ -15,11 +15,11 @@ Supported modules:
 Unsupported modules:
 
  * [Oxa](http://variableinc.com/oxa-gas-sensors/)
-   * Need to understand calibration
- * [Chroma](http://variableinc.com/chroma-color-sensor/)
    * Need to understand data
+ * [Chroma](http://variableinc.com/chroma-color-sensor/)
+   * Need to understand calibration
  * [CO2](http://variableinc.com/product/node-co2/)
-   * No accress to module
+   * No access to module
 
 Install
 -------
