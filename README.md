@@ -24,7 +24,7 @@ Unsupported modules:
 Install
 -------
 
-npm install node-sensor
+    npm install node-sensor
 
 Usage
 -----
@@ -131,6 +131,8 @@ Events:
     nodeSensor.on('thermocoupleTemperatureReading', callback(temperature));
 
 __Barcode__
+
+Press button to scan barcode.
 
 Events:
 
