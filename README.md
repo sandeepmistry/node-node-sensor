@@ -1,6 +1,8 @@
 node-node-sensor
 ================
 
+[![Analytics](https://ga-beacon.appspot.com/UA-56089547-1/sandeepmistry/node-node-sensor?pixel)](https://github.com/igrigorik/ga-beacon)
+
 node.js lib for [Variable Inc.'s](http://variableinc.com) [NODE sensor](http://variableinc.com/product/ios-platform-node/)
 
 Supported modules:
